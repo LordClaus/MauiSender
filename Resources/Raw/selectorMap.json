@@ -1,0 +1,8 @@
+﻿{
+	"list.item": ".ladies-online .user-card, .user-card",
+	"list.item.id": "[data-user-id]",
+	"chat.input": "#messageBox, textarea[name='message'], textarea, input[type='text']",
+	"chat.send": "button.send, .send-btn, button[type='submit']",
+	"chat.active.marker": ".chat-open, .chat-active",
+	"profile.name": ".username, .profile-name"
+}
