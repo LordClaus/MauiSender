@@ -1,28 +1,15 @@
-﻿// Services/DelayPolicy.cs
-namespace MauiSender.Services;
-
-public class DelayPolicy
+﻿namespace MauiSender.Services
 {
-    private readonly Random _rnd = new();
-    public int BaseMessageSec { get; private set; }
-    public int PartSec { get; private set; }
-    public int JitterPct { get; private set; }
-
-    public DelayPolicy(int baseMessageSec = 45, int partSec = 45, int jitterPct = 10)
+    public sealed class DelayPolicy
     {
-        BaseMessageSec = Math.Max(1, baseMessageSec);
-        PartSec = Math.Max(1, partSec);
-        JitterPct = Math.Clamp(jitterPct, 0, 30);
-    }
+        public int MessageIntervalSec { get; set; } = 30;
+        public int PartDelaySec { get; set; } = 8;
 
-    private int ApplyJitterMs(int ms)
-    {
-        if (JitterPct <= 0) return ms;
-        var delta = (int)(ms * (JitterPct / 100.0));
-        return Math.Max(0, ms + _rnd.Next(-delta, delta + 1));
-    }
+        // За бажанням — динамічні провайдери:
+        public Func<int>? MessageIntervalProvider { get; set; }
+        public Func<int>? PartDelayProvider { get; set; }
 
-    public Task PartDelayAsync() => Task.Delay(ApplyJitterMs(PartSec * 1000));
-    public Task MessageDelayAsync() => Task.Delay(ApplyJitterMs(BaseMessageSec * 1000));
-    public Task HumanSmallAsync() => Task.Delay(_rnd.Next(200, 801));
+        public int GetMessageInterval() => MessageIntervalProvider?.Invoke() ?? MessageIntervalSec;
+        public int GetPartDelay() => PartDelayProvider?.Invoke() ?? PartDelaySec;
+    }
 }

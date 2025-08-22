@@ -1,28 +1,15 @@
-﻿using MauiSender.Models;
-
-namespace MauiSender.Services;
-
-public class Navigator
+﻿namespace MauiSender.Services
 {
-    private readonly DomBridge _dom;
-    private readonly SelectorMap _map;
-
-    public Navigator(DomBridge dom, SelectorMap map)
+    public sealed class Navigator
     {
-        _dom = dom ?? throw new ArgumentNullException(nameof(dom));
-        _map = map ?? throw new ArgumentNullException(nameof(map));
-    }
+        private readonly WebView _web;
 
-    public async Task<string[]> GetRecipientIdsAsync()
-    {
-        return await _dom.QueryAllIdsAsync(_map.ListItem, _map.ListItemIdAttr);
-    }
+        public Navigator(WebView web) => _web = web ?? throw new ArgumentNullException(nameof(web));
 
-    public async Task<bool> OpenChatForAsync(string id)
-    {
-        // try to click an element that contains data-user-id == id
-        var sel = $"{_map.ListItem}[data-user-id='{id}'], {_map.ListItem}[data-id='{id}'], {_map.ListItem}#{id}";
-        var res = await _dom.ClickAsync(sel);
-        return string.Equals(res, "OK", StringComparison.OrdinalIgnoreCase);
+        public Task GoAsync(string url)
+        {
+            _web.Source = url;
+            return Task.CompletedTask;
+        }
     }
 }

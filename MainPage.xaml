@@ -3,56 +3,39 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              x:Class="MauiSender.MainPage"
              xmlns:vm="clr-namespace:MauiSender.ViewModels">
-    <ContentPage.BindingContext>
-        <vm:MainViewModel />
-    </ContentPage.BindingContext>
-
-    <Grid RowDefinitions="Auto,*" Padding="8" RowSpacing="8">
+    <Grid RowDefinitions="Auto,*">
         <!-- TopBar -->
-        <Grid Grid.Row="0" ColumnDefinitions="*,Auto,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="8" Padding="8" BackgroundColor="{AppThemeBinding Light=#f3f4f6, Dark=#1f2937}">
-            <HorizontalStackLayout Grid.Column="0" Spacing="8">
-                <Picker Title="Шаблони" ItemsSource="{Binding TemplateNames}" SelectedItem="{Binding SelectedTemplateName}"/>
-                <Picker Title="Режим" ItemsSource="{Binding Modes}" SelectedItem="{Binding SelectedMode}"/>
-            </HorizontalStackLayout>
+        <Grid Grid.Row="0" Padding="8" ColumnDefinitions="Auto,Auto,Auto,Auto,*,Auto,Auto,Auto,Auto" ColumnSpacing="8">
+            <Label Text="Mode:" VerticalOptions="Center" />
+            <Picker x:Name="PickerMode" Grid.Column="1" WidthRequest="140">
+                <Picker.Items>
+                    <x:String>Random</x:String>
+                    <x:String>RoundRobin</x:String>
+                </Picker.Items>
+            </Picker>
 
-            <VerticalStackLayout Grid.Column="1" Spacing="4">
-                <Label Text="Інтервал (сек)" FontSize="10"/>
-                <Entry WidthRequest="80" Keyboard="Numeric" Text="{Binding BaseIntervalSec}"/>
-            </VerticalStackLayout>
+            <Label Grid.Column="2" Text="Base Interval (sec):" VerticalOptions="Center" />
+            <Entry x:Name="EntryBaseInterval" Grid.Column="3" WidthRequest="80" Keyboard="Numeric" Text="30" />
 
-            <VerticalStackLayout Grid.Column="2" Spacing="4">
-                <Label Text="Part delay (сек)" FontSize="10"/>
-                <Entry WidthRequest="80" Keyboard="Numeric" Text="{Binding PartIntervalSec}"/>
-            </VerticalStackLayout>
+            <Label Grid.Column="4" Text="Part Delay (sec):" VerticalOptions="Center" />
+            <Entry x:Name="EntryPartDelay" Grid.Column="5" WidthRequest="80" Keyboard="Numeric" Text="8" />
 
-            <VerticalStackLayout Grid.Column="3" Spacing="4">
-                <Label Text="Jitter (%)" FontSize="10"/>
-                <Entry WidthRequest="60" Keyboard="Numeric" Text="{Binding JitterPct}"/>
-            </VerticalStackLayout>
-
-            <HorizontalStackLayout Grid.Column="4" Spacing="6" VerticalOptions="Center">
-                <Button Text="Start" Command="{Binding StartCommand}"/>
-                <Button Text="{Binding PauseResumeText}" Command="{Binding PauseResumeCommand}"/>
-                <Button Text="Stop" Command="{Binding StopCommand}"/>
-            </HorizontalStackLayout>
-
-            <HorizontalStackLayout Grid.Column="5" Spacing="6" VerticalOptions="Center">
-                <Button Text="Шаблони" Command="{Binding ManageTemplatesCommand}"/>
-                <Button Text="Blacklist" Command="{Binding ManageBlacklistCommand}"/>
-                <Button Text="Експорт" Command="{Binding ExportLogsCommand}"/>
-            </HorizontalStackLayout>
-
-            <VerticalStackLayout Grid.Column="6" Spacing="2" HorizontalOptions="End">
-                <Label Text="{Binding CountersText}" FontAttributes="Bold"/>
-                <Label Text="{Binding ActiveTemplateText}" FontSize="12"/>
-                <Label Text="{Binding NextRecipientText}" FontSize="12"/>
-            </VerticalStackLayout>
+            <Button x:Name="BtnStart" Grid.Column="6" Text="Start" Clicked="OnStartClicked" />
+            <Button x:Name="BtnStop"  Grid.Column="7" Text="Stop"  Clicked="OnStopClicked"  IsEnabled="False" />
+            <Button x:Name="BtnReload" Grid.Column="8" Text="Reload templates" Clicked="OnReloadClicked" />
         </Grid>
 
-        <!-- WebView -->
-        <WebView Grid.Row="1"
-             x:Name="GoldenWeb"
-             Source="https://goldenbride.net"
-             Navigated="WebView_Navigated" />
+        <!-- Другий ряд: керування шаблонами -->
+        <Grid Grid.Row="0" Margin="8,48,8,0" ColumnDefinitions="Auto,Auto,Auto" ColumnSpacing="8">
+            <Button Text="Add template" Clicked="OnAddTemplateClicked" />
+            <Button Grid.Column="1" Text="Edit template" Clicked="OnEditTemplateClicked" />
+            <Button Grid.Column="2" Text="Delete template" Clicked="OnDeleteTemplateClicked" />
+        </Grid>
+
+        <!-- Робоче вікно: WebView -->
+        <WebView x:Name="MyWebView" Grid.Row="1"
+                 Source="https://goldenbride.net"
+                 Navigating="Web_Navigating"
+                 Navigated="Web_Navigated" />
     </Grid>
 </ContentPage>

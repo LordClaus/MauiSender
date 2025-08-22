@@ -1,23 +1,13 @@
 ﻿using MauiSender.Models;
 
-namespace MauiSender.Services;
-
-public class SelectorMapService
+namespace MauiSender.Services
 {
-    private readonly string _path = FileUtil.PathInData("selectors.json");
-
-    public async Task EnsureAsync()
+    public sealed class SelectorMapService
     {
-        await FileUtil.EnsureJsonFileAsync(_path, new SelectorMap());
-    }
+        public static SelectorMapService Current { get; } = new SelectorMapService();
 
-    public async Task<SelectorMap> LoadAsync()
-    {
-        return await FileUtil.LoadJsonAsync(_path, new SelectorMap());
-    }
+        public SelectorMap Map { get; private set; } = SelectorMap.LoadFromEmbedded();
 
-    public async Task SaveAsync(SelectorMap map)
-    {
-        await FileUtil.SaveJsonAsync(_path, map);
+        public void Replace(SelectorMap map) => Map = map ?? new SelectorMap();
     }
 }

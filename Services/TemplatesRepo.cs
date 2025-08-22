@@ -1,40 +1,56 @@
-﻿using MauiSender.Models;
+﻿using System.Text.Json;
 
-namespace MauiSender.Services;
-
-public class TemplatesRepo
+namespace MauiSender.Services
 {
-    private readonly string _path = FileUtil.PathInData("templates.json");
-
-    public async Task EnsureAsync()
+    public sealed class TemplatesRepo
     {
-        var defaultList = new List<Template>
+        private readonly string _path;
+        private readonly JsonSerializerOptions _opts = new() { WriteIndented = true };
+        private List<string> _cache = new();
+
+        public TemplatesRepo(string path)
         {
-            new Template
+            _path = path;
+            EnsureFile();
+            _cache = Load();
+        }
+
+        private void EnsureFile()
+        {
+            if (!File.Exists(_path))
             {
-                Id = Guid.NewGuid().ToString("N"),
-                Name = "Привітання (default)",
-                RawText = "Привіт! --- Як справи?",
-                Enabled = true,
-                Weight = 1
+                var defaults = new List<string>
+                {
+                    "Привіт! Мене звати Анна. --- Рада знайомству!",
+                    "Твій профіль мене зацікавив. ---5--- Я зараз онлайн."
+                };
+                File.WriteAllText(_path, JsonSerializer.Serialize(defaults, _opts));
             }
-        };
-        defaultList.ForEach(t => t.ParseParts());
-        await FileUtil.EnsureJsonFileAsync(_path, defaultList);
-    }
+        }
 
-    public async Task<List<Template>> LoadAsync()
-    {
-        var list = await FileUtil.LoadJsonAsync(_path, new List<Template>());
-        foreach (var t in list)
-            if (t.Parts == null || t.Parts.Count == 0)
-                t.ParseParts();
-        return list;
-    }
+        private List<string> Load()
+        {
+            try
+            {
+                var json = File.ReadAllText(_path);
+                return JsonSerializer.Deserialize<List<string>>(json) ?? new();
+            }
+            catch { return new(); }
+        }
 
-    public async Task SaveAsync(List<Template> templates)
-    {
-        templates.ForEach(t => t.ParseParts());
-        await FileUtil.SaveJsonAsync(_path, templates);
+        private void Save() =>
+            File.WriteAllText(_path, JsonSerializer.Serialize(_cache, _opts));
+
+        public IReadOnlyList<string> All => _cache;
+
+        public void ReplaceAll(IEnumerable<string> items)
+        {
+            _cache = items?.ToList() ?? new();
+            Save();
+        }
+
+        public void Add(string t) { _cache.Add(t); Save(); }
+        public void RemoveAt(int idx) { _cache.RemoveAt(idx); Save(); }
+        public void UpdateAt(int idx, string t) { _cache[idx] = t; Save(); }
     }
 }

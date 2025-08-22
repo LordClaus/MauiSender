@@ -1,23 +1,42 @@
-﻿using MauiSender.Models;
+﻿using System.Text.Json;
+using MauiSender.Models;
 
-namespace MauiSender.Services;
-
-public class SettingsService
+namespace MauiSender.Services
 {
-    private readonly string _path = FileUtil.PathInData("settings.json");
-
-    public async Task EnsureAsync()
+    public sealed class SettingsService
     {
-        await FileUtil.EnsureJsonFileAsync(_path, new SettingsModel());
-    }
+        private readonly string _path;
+        private readonly JsonSerializerOptions _opts = new() { WriteIndented = true };
+        private SettingsModel _cache = new();
 
-    public async Task<SettingsModel> LoadAsync()
-    {
-        return await FileUtil.LoadJsonAsync(_path, new SettingsModel());
-    }
+        public SettingsService(string path)
+        {
+            _path = path;
+            Load();
+        }
 
-    public async Task SaveAsync(SettingsModel cfg)
-    {
-        await FileUtil.SaveJsonAsync(_path, cfg);
+        public SettingsModel Current => _cache;
+
+        public void Load()
+        {
+            try
+            {
+                if (File.Exists(_path))
+                {
+                    var raw = File.ReadAllText(_path);
+                    _cache = JsonSerializer.Deserialize<SettingsModel>(raw) ?? new SettingsModel();
+                }
+                else
+                {
+                    Save();
+                }
+            }
+            catch { _cache = new SettingsModel(); }
+        }
+
+        public void Save()
+        {
+            File.WriteAllText(_path, JsonSerializer.Serialize(_cache, _opts));
+        }
     }
 }

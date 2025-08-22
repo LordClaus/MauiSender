@@ -1,25 +1,12 @@
-﻿// Models/SelectorMap.cs
-using System.Text.Json.Serialization;
-
-namespace MauiSender.Models;
-
-public class SelectorMap
+﻿namespace MauiSender.Models
 {
-    [JsonPropertyName("list.item")]
-    public string ListItem { get; set; } = ".ladies-online .user-card";
+    public sealed class SelectorMap
+    {
+        public string InputSelector { get; set; } = "#messageBox, textarea[name='message'], textarea";
+        public string SendButtonSelector { get; set; } = "button.send, button[type=submit], .send-btn";
+        public string RecipientsListSelector { get; set; } = ".users-list .user";
 
-    [JsonPropertyName("list.item.id")]
-    public string ListItemIdAttr { get; set; } = "[data-user-id]";
-
-    [JsonPropertyName("chat.input")]
-    public string ChatInput { get; set; } = "#messageBox, textarea[name='message']";
-
-    [JsonPropertyName("chat.send")]
-    public string ChatSend { get; set; } = "button.send, .send-btn";
-
-    [JsonPropertyName("chat.active.marker")]
-    public string ChatActiveMarker { get; set; } = ".chat-open";
-
-    [JsonPropertyName("profile.name")]
-    public string ProfileName { get; set; } = ".username";
+        public static SelectorMap LoadFromEmbedded(string? _ = null)
+            => new SelectorMap(); // дефолтні селектори
+    }
 }

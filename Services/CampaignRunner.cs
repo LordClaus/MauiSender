@@ -1,202 +1,122 @@
-﻿// Services/CampaignRunner.cs
-using MauiSender.Models;
+﻿using MauiSender.Models;
 
-namespace MauiSender.Services;
-
-public class CampaignRunner
+namespace MauiSender.Services
 {
-    public event Action<int, int, int>? CountersChanged;
-    public event Action<int, int, int>? CountersUpdated; // alias for older call sites
-
-    private int _sent;
-    private int _failed;
-    private int _waiting;
-
-    private DomBridge? _dom;
-    private SelectorMap? _selectors;
-    private readonly TemplatesRepo _templatesRepo;
-    private readonly BlacklistRepo _blacklistRepo;
-    private readonly LogsRepo _logsRepo;
-    private readonly DelayPolicy _delay;
-    private readonly SettingsService _settings;
-
-    private CancellationTokenSource? _cts;
-    private bool _paused;
-
-    public bool IsRunning => _cts != null && !_cts.IsCancellationRequested && !_paused;
-    public bool IsPaused => _paused;
-
-    // Mode property for backward compatibility
-    public TemplateMode Mode { get; set; } = TemplateMode.RandomWeighted;
-
-    // Full constructor (keeps backward-compatibility signature)
-    public CampaignRunner(
-        TemplatesRepo templatesRepo,
-        BlacklistRepo blacklistRepo,
-        LogsRepo logsRepo,
-        DelayPolicy delay,
-        SettingsService settings,
-        object optionalA = null,
-        object optionalB = null)
+    public sealed class CampaignRunner
     {
-        _templatesRepo = templatesRepo;
-        _blacklistRepo = blacklistRepo;
-        _logsRepo = logsRepo;
-        _delay = delay;
-        _settings = settings;
-    }
+        private readonly DomBridge _dom;
+        private readonly TemplatesRepo _templates;
+        private readonly BlacklistRepo _blacklist;
+        private readonly LogsRepo _logs;
+        private readonly DelayPolicy _delay;
+        private readonly Navigator _nav;
+        private readonly SettingsService _settings;
 
-    public void AttachDom(DomBridge dom) => _dom = dom;
-    public void AttachDom(DomBridge dom, SelectorMap selectors) { _dom = dom; _selectors = selectors; }
+        public TemplateMode Mode { get; set; } = TemplateMode.Random;
 
-    public void Pause() { _paused = true; RaiseCounters(); }
-    public void Resume() { _paused = false; RaiseCounters(); }
-    public void TogglePause() { _paused = !_paused; RaiseCounters(); }
-    public void Stop()
-    {
-        _cts?.Cancel();
-        _cts = null;
-        _paused = false;
-        RaiseCounters();
-    }
+        // Селектори можна тримати тут або читати з SelectorMapService.Current.Map
+        public string InputSelector { get; set; } = "#messageBox, textarea";
+        public string SendButtonSelector { get; set; } = "button.send, button[type=submit]";
 
-    private void RaiseCounters()
-    {
-        CountersChanged?.Invoke(_sent, _failed, _waiting);
-        CountersUpdated?.Invoke(_sent, _failed, _waiting);
-    }
-
-    // Start using current settings loaded from SettingsService
-    public async Task StartAsync()
-    {
-        var settings = await _settings.LoadAsync();
-        await StartAsync(settings, CancellationToken.None);
-    }
-
-    // Start with explicit settings (keeps existing signature)
-    public async Task StartAsync(SettingsModel settings, CancellationToken? externalToken = null)
-    {
-        if (_dom == null) throw new InvalidOperationException("DomBridge not attached");
-        if (_templatesRepo == null) throw new InvalidOperationException("TemplatesRepo not provided");
-
-        if (_cts != null) return; // already running
-
-        _cts = CancellationTokenSource.CreateLinkedTokenSource(externalToken ?? CancellationToken.None);
-        _paused = false;
-        _sent = 0; _failed = 0; _waiting = 0;
-        RaiseCounters();
-
-        var templates = await _templatesRepo.LoadAsync();
-        templates.ForEach(t => { if (t.Parts.Count == 0) t.ParseParts(); });
-
-        var blacklist = await _blacklistRepo.LoadAsync();
-        var selectors = _selectors ?? new SelectorMap();
-        // background loop
-        _ = Task.Run(async () =>
+        public CampaignRunner(
+            DomBridge dom,
+            TemplatesRepo templates,
+            BlacklistRepo blacklist,
+            LogsRepo logs,
+            DelayPolicy delay,
+            Navigator nav,
+            SettingsService settings)
         {
-            try
+            _dom = dom;
+            _templates = templates;
+            _blacklist = blacklist;
+            _logs = logs;
+            _delay = delay;
+            _nav = nav;
+            _settings = settings;
+        }
+
+        public async Task RunAsync(CancellationToken token)
+        {
+            await _dom.InjectHelpersAsync();
+
+            var list = _templates.All.ToList();
+            if (list.Count == 0) return;
+
+            var i = 0;
+            while (!token.IsCancellationRequested)
             {
-                while (!_cts.IsCancellationRequested)
+                var tpl = Mode == TemplateMode.RoundRobin
+                    ? list[i++ % list.Count]
+                    : list[Random.Shared.Next(list.Count)];
+
+                // Розбити шаблон на частини за ---/---N---
+                var parts = SplitTemplate(tpl, _delay.GetPartDelay());
+
+                foreach (var p in parts)
                 {
-                    while (_paused && !_cts.IsCancellationRequested)
-                        await Task.Delay(200, _cts.Token);
+                    token.ThrowIfCancellationRequested();
 
-                    var ids = await _dom.QueryAllIdsAsync(selectors.ListItem, selectors.ListItemIdAttr);
-                    var queue = ids.Where(id => !string.IsNullOrWhiteSpace(id) && !blacklist.Contains(id)).ToList();
-                    _waiting = queue.Count;
-                    RaiseCounters();
+                    // Вставити текст і (за потреби) натиснути кнопку
+                    await _dom.FillAsync(InputSelector, p.Text);
+                    // Якщо хочеш — клікай Send кожну частину або лише після останньої
+                    // await _dom.ClickAsync(SendButtonSelector);
 
-                    if (queue.Count == 0)
+                    await Task.Delay(TimeSpan.FromSeconds(p.DelayAfterSec), token);
+                }
+
+                await _logs.AppendAsync(new LogsRepo.LogEntry
+                {
+                    Timestamp = DateTimeOffset.UtcNow,
+                    Message = tpl,
+                    Status = "OK",
+                });
+
+                await Task.Delay(TimeSpan.FromSeconds(_delay.GetMessageInterval()), token);
+            }
+        }
+
+        private readonly record struct Part(string Text, int DelayAfterSec);
+
+        private static List<Part> SplitTemplate(string raw, int defaultDelaySec)
+        {
+            // Підтримка: "Hello --- world", "Hello ---5--- world"
+            var parts = new List<Part>();
+            var sb = new System.Text.StringBuilder();
+            int i = 0;
+            while (i < raw.Length)
+            {
+                if (raw[i] == '-' && i + 2 < raw.Length && raw[i + 1] == '-' && raw[i + 2] == '-')
+                {
+                    // знайдено --- або ---N---
+                    // закриваємо попередній текст як частину
+                    var chunk = sb.ToString().Trim();
+                    if (chunk.Length > 0) parts.Add(new Part(chunk, defaultDelaySec));
+                    sb.Clear();
+
+                    // перевіримо на число між двома блоками ---
+                    i += 3;
+                    // якщо далі йде число і потім знову --- (типу ---5---)
+                    int j = i;
+                    while (j < raw.Length && char.IsDigit(raw[j])) j++;
+                    bool hasNumber = j > i && j + 2 < raw.Length && raw[j] == '-' && raw[j + 1] == '-' && raw[j + 2] == '-';
+
+                    if (hasNumber)
                     {
-                        await Task.Delay(1000, _cts.Token);
-                        continue;
+                        var numStr = raw.Substring(i, j - i);
+                        if (int.TryParse(numStr, out var n) && n > 0)
+                            defaultDelaySec = n; // локально оновлюємо для наступного шматка
+
+                        i = j + 3; // перескочили другі ---
                     }
-
-                    foreach (var uid in queue)
-                    {
-                        if (_cts.IsCancellationRequested) break;
-                        while (_paused && !_cts.IsCancellationRequested) await Task.Delay(200, _cts.Token);
-
-                        var tpl = PickTemplate(templates, settings.TemplateMode);
-                        if (tpl == null) continue;
-
-                        var ok = await SendToRecipientAsync(uid, tpl, selectors, _cts.Token);
-                        if (ok) _sent++; else _failed++;
-                        _waiting = Math.Max(0, _waiting - 1);
-                        RaiseCounters();
-
-                        await _delay.MessageDelayAsync();
-                    }
+                    continue;
                 }
+                sb.Append(raw[i]);
+                i++;
             }
-            catch (OperationCanceledException) { /* cancelled */ }
-            finally
-            {
-                _cts = null;
-                _paused = false;
-                RaiseCounters();
-            }
-        });
-    }
-
-    private Template? PickTemplate(List<Template> templates, TemplateMode mode)
-    {
-        var enabled = templates.Where(t => t.Enabled && t.Parts.Any()).ToList();
-        if (!enabled.Any()) return null;
-
-        if (mode == TemplateMode.RoundRobin)
-        {
-            var t = enabled[0];
-            enabled.RemoveAt(0);
-            enabled.Add(t);
-            return t;
-        }
-
-        var sum = enabled.Sum(t => Math.Max(1, t.Weight));
-        var r = Random.Shared.Next(0, Math.Max(1, sum));
-        var acc = 0;
-        foreach (var t in enabled)
-        {
-            acc += Math.Max(1, t.Weight);
-            if (r < acc) return t;
-        }
-        return enabled.First();
-    }
-
-    private async Task<bool> SendToRecipientAsync(string uid, Template tpl, SelectorMap selectors, CancellationToken token)
-    {
-        try
-        {
-            for (int i = 0; i < tpl.Parts.Count; i++)
-            {
-                var part = tpl.Parts[i];
-                await _delay.HumanSmallAsync();
-
-                var fill = await _dom.FillAsync(selectors.ChatInput, part);
-                if (!string.Equals(fill, "OK", StringComparison.OrdinalIgnoreCase))
-                {
-                    await _logsRepo.AppendAsync(new LogEntry { UserId = uid, TemplateId = tpl.Id, PartIndex = i, Ts = DateTime.UtcNow, Status = "FAIL", Error = fill });
-                    return false;
-                }
-
-                await _delay.HumanSmallAsync();
-
-                var click = await _dom.ClickAsync(selectors.ChatSend);
-                if (!string.Equals(click, "OK", StringComparison.OrdinalIgnoreCase))
-                {
-                    await _logsRepo.AppendAsync(new LogEntry { UserId = uid, TemplateId = tpl.Id, PartIndex = i, Ts = DateTime.UtcNow, Status = "FAIL", Error = click });
-                    return false;
-                }
-
-                await _logsRepo.AppendAsync(new LogEntry { UserId = uid, TemplateId = tpl.Id, PartIndex = i, Ts = DateTime.UtcNow, Status = "OK" });
-                await _delay.PartDelayAsync();
-            }
-            return true;
-        }
-        catch (Exception ex)
-        {
-            await _logsRepo.AppendAsync(new LogEntry { UserId = uid, TemplateId = tpl.Id, PartIndex = -1, Ts = DateTime.UtcNow, Status = "FAIL", Error = ex.Message });
-            return false;
+            var last = sb.ToString().Trim();
+            if (last.Length > 0) parts.Add(new Part(last, defaultDelaySec));
+            return parts;
         }
     }
 }
