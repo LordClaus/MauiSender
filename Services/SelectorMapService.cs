@@ -1,37 +1,27 @@
-﻿// MauiSender/Services/SelectorMapService.cs
-using System.Text.Json;
-using MauiSender.Models;
+﻿using MauiSender.Models;
 
 namespace MauiSender.Services;
 
 public class SelectorMapService
 {
-    private readonly string _file;
-    private SelectorMap _map = new();
+    private readonly string _path;
 
-    public SelectorMapService(FileSystemService fs)
+    public SelectorMapService(SettingsService settingsService)
     {
-        _file = fs.PathFor("selectors.json");
+        // шлях зчитуємо з settings, але якщо settings ще не створений – fallback
+        var defPath = FileUtil.PathInData("selectors.json");
+        _path = defPath;
+    }
+
+    public async Task EnsureAsync()
+    {
+        var def = new SelectorMap();
+        await FileUtil.EnsureJsonFileAsync(_path, def);
     }
 
     public async Task<SelectorMap> LoadAsync()
-    {
-        if (!File.Exists(_file))
-        {
-            await SaveAsync(_map);
-            return _map;
-        }
-        var json = await File.ReadAllTextAsync(_file);
-        _map = JsonSerializer.Deserialize<SelectorMap>(json) ?? new SelectorMap();
-        return _map;
-    }
+        => await FileUtil.LoadJsonAsync(_path, new SelectorMap());
 
     public async Task SaveAsync(SelectorMap map)
-    {
-        _map = map;
-        var json = JsonSerializer.Serialize(map, new JsonSerializerOptions { WriteIndented = true });
-        await File.WriteAllTextAsync(_file, json);
-    }
-
-    public SelectorMap Current => _map;
+        => await FileUtil.SaveJsonAsync(_path, map);
 }

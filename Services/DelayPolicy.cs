@@ -1,33 +1,36 @@
-﻿// MauiSender/Services/DelayPolicy.cs
-namespace MauiSender.Services;
+﻿namespace MauiSender.Services;
 
 public class DelayPolicy
 {
-    public int BaseMessageSec { get; set; }
-    public int PartSec { get; set; }
-    public int JitterPct { get; set; }
+    private readonly int _baseIntervalMs;
+    private readonly int _partIntervalMs;
+    private readonly int _jitterPct;
+    private readonly Random _rnd = new();
 
-    public DelayPolicy(int baseMessageSec, int partSec, int jitterPct)
+    public DelayPolicy(int baseIntervalSec, int partIntervalSec, int jitterPct)
     {
-        BaseMessageSec = Math.Max(1, baseMessageSec);
-        PartSec = Math.Max(1, partSec);
-        JitterPct = Math.Clamp(jitterPct, 0, 30);
+        _baseIntervalMs = Math.Max(0, baseIntervalSec) * 1000;
+        _partIntervalMs = Math.Max(0, partIntervalSec) * 1000;
+        _jitterPct = Math.Clamp(jitterPct, 0, 30);
     }
 
-    private int ApplyJitter(int ms)
+    private int WithJitter(int ms)
     {
-        var pct = JitterPct / 100.0;
-        var delta = (int)(ms * pct);
-        var jitter = Random.Shared.Next(-delta, delta + 1);
-        return Math.Max(0, ms + jitter);
+        if (_jitterPct <= 0) return ms;
+        var delta = (int)(ms * (_jitterPct / 100.0));
+        var offset = _rnd.Next(-delta, delta + 1);
+        return Math.Max(0, ms + offset);
     }
 
-    public Task PartDelayAsync() =>
-        Task.Delay(ApplyJitter(PartSec * 1000));
+    public Task SmallHumanDelayAsync()
+    {
+        var ms = _rnd.Next(200, 801);
+        return Task.Delay(ms);
+    }
 
-    public Task MessageDelayAsync() =>
-        Task.Delay(ApplyJitter(BaseMessageSec * 1000));
+    public Task MessageDelayAsync()
+        => Task.Delay(WithJitter(_baseIntervalMs));
 
-    public static async Task HumanDelayAsync(int minMs = 200, int maxMs = 800) =>
-        await Task.Delay(Random.Shared.Next(minMs, maxMs + 1));
+    public Task PartDelayAsync()
+        => Task.Delay(WithJitter(_partIntervalMs));
 }

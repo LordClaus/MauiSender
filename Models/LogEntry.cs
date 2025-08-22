@@ -1,13 +1,27 @@
-﻿namespace MauiSender.Models;
+﻿using System.Text.Json.Serialization;
+
+namespace MauiSender.Models;
 
 public class LogEntry
 {
-    [SQLite.PrimaryKey, SQLite.AutoIncrement]
-    public int Id { get; set; }
-    public string UserId { get; set; } = "";
-    public string TemplateId { get; set; } = "";
+    [JsonPropertyName("id")]
+    public string Id { get; set; } = Guid.NewGuid().ToString("N");
+
+    [JsonPropertyName("userId")]
+    public string UserId { get; set; } = string.Empty;
+
+    [JsonPropertyName("templateId")]
+    public string TemplateId { get; set; } = string.Empty;
+
+    [JsonPropertyName("partIndex")]
     public int PartIndex { get; set; }
+
+    [JsonPropertyName("ts")]
     public DateTime Ts { get; set; } = DateTime.UtcNow;
-    public string Status { get; set; } = "sent";
+
+    [JsonPropertyName("status")]
+    public string Status { get; set; } = "OK";
+
+    [JsonPropertyName("error")]
     public string? Error { get; set; }
 }

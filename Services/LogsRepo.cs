@@ -1,24 +1,25 @@
-﻿// MauiSender/Services/LogsRepo.cs
-using SQLite;
-using MauiSender.Models;
+﻿using MauiSender.Models;
 
 namespace MauiSender.Services;
 
 public class LogsRepo
 {
-    private readonly SQLiteAsyncConnection _db;
+    private readonly string _path = FileUtil.PathInData("logs.jsonl"); // JSON Lines
 
-    public LogsRepo(FileSystemService fs)
+    public async Task EnsureAsync()
     {
-        var path = fs.PathFor("logs.db3");
-        _db = new SQLiteAsyncConnection(path);
-        _db.CreateTableAsync<LogEntry>().Wait();
+        await FileUtil.EnsureDirAsync();
+        if (!File.Exists(_path))
+        {
+            using var _ = File.Create(_path);
+        }
+        await Task.CompletedTask;
     }
 
-    public Task<int> AddAsync(LogEntry entry) => _db.InsertAsync(entry);
-
-    public Task<List<LogEntry>> GetByDateAsync(DateTime from, DateTime to) =>
-        _db.Table<LogEntry>()
-           .Where(l => l.Ts >= from && l.Ts <= to)
-           .ToListAsync();
+    public async Task AppendAsync(LogEntry entry)
+    {
+        await EnsureAsync();
+        var line = System.Text.Json.JsonSerializer.Serialize(entry);
+        await File.AppendAllTextAsync(_path, line + Environment.NewLine);
+    }
 }

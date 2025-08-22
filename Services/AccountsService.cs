@@ -1,32 +1,33 @@
-﻿// MauiSender/Services/AccountsService.cs
-using System.Collections.ObjectModel;
-using System.Text.Json;
-using MauiSender.Models;
+﻿using MauiSender.Models;
 
 namespace MauiSender.Services;
 
-public class AccountsService
+public class AccountіService
 {
-    private readonly FileSystemService _fs;
-    private readonly string _file;
+    private readonly string _path = FileUtil.PathInData("accounts.json");
 
-    public AccountsService(FileSystemService fs)
+    public async Task EnsureAsync()
     {
-        _fs = fs;
-        _file = fs.PathFor("accounts.json");
+        await FileUtil.EnsureJsonFileAsync(_path, new List<Account>());
     }
 
-    public async Task<ObservableCollection<Account>> LoadAsync()
+    public async Task<List<Account>> LoadAsync()
+        => await FileUtil.LoadJsonAsync(_path, new List<Account>());
+
+    public async Task SaveAsync(List<Account> accounts)
+        => await FileUtil.SaveJsonAsync(_path, accounts);
+
+    public async Task AddAsync(Account a)
     {
-        await _fs.EnsureExistsAsync("accounts.json");
-        var json = await File.ReadAllTextAsync(_file);
-        var list = JsonSerializer.Deserialize<List<Account>>(json) ?? new List<Account>();
-        return new ObservableCollection<Account>(list);
+        var list = await LoadAsync();
+        list.Add(a);
+        await SaveAsync(list);
     }
 
-    public async Task SaveAsync(IEnumerable<Account> accounts)
+    public async Task RemoveAsync(string login)
     {
-        var json = JsonSerializer.Serialize(accounts, new JsonSerializerOptions { WriteIndented = true });
-        await File.WriteAllTextAsync(_file, json);
+        var list = await LoadAsync();
+        list.RemoveAll(x => string.Equals(x.Login, login, StringComparison.OrdinalIgnoreCase));
+        await SaveAsync(list);
     }
 }
