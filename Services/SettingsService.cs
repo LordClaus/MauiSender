@@ -7,14 +7,11 @@ public class SettingsService
     private readonly string _path = FileUtil.PathInData("settings.json");
 
     public async Task EnsureAsync()
-    {
-        var def = new SettingsModel();
-        await FileUtil.EnsureJsonFileAsync(_path, def);
-    }
+        => await FileUtil.EnsureJsonFileAsync(_path, new SettingsModel());
 
     public async Task<SettingsModel> LoadAsync()
         => await FileUtil.LoadJsonAsync(_path, new SettingsModel());
 
-    public async Task SaveAsync(SettingsModel settings)
-        => await FileUtil.SaveJsonAsync(_path, settings);
+    public async Task SaveAsync(SettingsModel cfg)
+        => await FileUtil.SaveJsonAsync(_path, cfg);
 }

@@ -6,40 +6,32 @@ namespace MauiSender.Services;
 internal static class FileUtil
 {
     public static string DataDir => FileSystem.AppDataDirectory;
+    public static string PathInData(string fileName) => Path.Combine(DataDir, fileName);
 
-    public static string PathInData(string fileName)
-        => System.IO.Path.Combine(DataDir, fileName);
-
-    public static async Task EnsureDirAsync()
+    public static void EnsureDir()
     {
         if (!Directory.Exists(DataDir))
             Directory.CreateDirectory(DataDir);
-        await Task.CompletedTask;
     }
 
     public static async Task EnsureJsonFileAsync<T>(string path, T defaultValue)
     {
-        await EnsureDirAsync();
+        EnsureDir();
         if (!File.Exists(path))
         {
-            var json = JsonSerializer.Serialize(defaultValue, new JsonSerializerOptions
-            {
-                WriteIndented = true
-            });
+            var json = JsonSerializer.Serialize(defaultValue, new JsonSerializerOptions { WriteIndented = true });
             await File.WriteAllTextAsync(path, json, Encoding.UTF8);
         }
     }
 
     public static async Task<T> LoadJsonAsync<T>(string path, T fallback)
     {
-        await EnsureDirAsync();
-        if (!File.Exists(path))
-            return fallback;
-
-        var json = await File.ReadAllTextAsync(path, Encoding.UTF8);
+        EnsureDir();
+        if (!File.Exists(path)) return fallback;
         try
         {
-            var obj = JsonSerializer.Deserialize<T>(json);
+            var json = await File.ReadAllTextAsync(path, Encoding.UTF8);
+            var obj = JsonSerializer.Deserialize<T>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
             return obj is null ? fallback : obj;
         }
         catch
@@ -48,13 +40,10 @@ internal static class FileUtil
         }
     }
 
-    public static async Task SaveJsonAsync<T>(string path, T value)
+    public static async Task SaveJsonAsync<T>(string path, T obj)
     {
-        await EnsureDirAsync();
-        var json = JsonSerializer.Serialize(value, new JsonSerializerOptions
-        {
-            WriteIndented = true
-        });
+        EnsureDir();
+        var json = JsonSerializer.Serialize(obj, new JsonSerializerOptions { WriteIndented = true });
         await File.WriteAllTextAsync(path, json, Encoding.UTF8);
     }
 }

@@ -2,35 +2,26 @@
 
 public class DelayPolicy
 {
-    private readonly int _baseIntervalMs;
-    private readonly int _partIntervalMs;
-    private readonly int _jitterPct;
     private readonly Random _rnd = new();
+    public int BaseMessageSec { get; private set; }
+    public int PartSec { get; private set; }
+    public int JitterPct { get; private set; }
 
-    public DelayPolicy(int baseIntervalSec, int partIntervalSec, int jitterPct)
+    public DelayPolicy(int baseMessageSec = 45, int partSec = 45, int jitterPct = 10)
     {
-        _baseIntervalMs = Math.Max(0, baseIntervalSec) * 1000;
-        _partIntervalMs = Math.Max(0, partIntervalSec) * 1000;
-        _jitterPct = Math.Clamp(jitterPct, 0, 30);
+        BaseMessageSec = Math.Max(1, baseMessageSec);
+        PartSec = Math.Max(1, partSec);
+        JitterPct = Math.Clamp(jitterPct, 0, 30);
     }
 
-    private int WithJitter(int ms)
+    private int ApplyJitterMs(int ms)
     {
-        if (_jitterPct <= 0) return ms;
-        var delta = (int)(ms * (_jitterPct / 100.0));
-        var offset = _rnd.Next(-delta, delta + 1);
-        return Math.Max(0, ms + offset);
+        if (JitterPct <= 0) return ms;
+        var delta = (int)(ms * (JitterPct / 100.0));
+        return Math.Max(0, ms + _rnd.Next(-delta, delta + 1));
     }
 
-    public Task SmallHumanDelayAsync()
-    {
-        var ms = _rnd.Next(200, 801);
-        return Task.Delay(ms);
-    }
-
-    public Task MessageDelayAsync()
-        => Task.Delay(WithJitter(_baseIntervalMs));
-
-    public Task PartDelayAsync()
-        => Task.Delay(WithJitter(_partIntervalMs));
+    public Task PartDelayAsync() => Task.Delay(ApplyJitterMs(PartSec * 1000));
+    public Task MessageDelayAsync() => Task.Delay(ApplyJitterMs(BaseMessageSec * 1000));
+    public Task HumanSmallAsync() => Task.Delay(_rnd.Next(200, 801));
 }

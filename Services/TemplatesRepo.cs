@@ -8,22 +8,24 @@ public class TemplatesRepo
 
     public async Task EnsureAsync()
     {
-        var def = new List<Template>
+        var defaultList = new List<Template>
         {
-            new Template
-            {
-                Name = "Привітання",
-                RawText = "Привіт! --- Як справи?",
-                Weight = 1
-            }
+            new Template { Name = "Привітання", RawText = "Привіт! --- Як справи?", Weight = 1, Enabled = true }
         };
-        def.ForEach(t => t.ParseParts());
-        await FileUtil.EnsureJsonFileAsync(_path, def);
+        defaultList.ForEach(t => t.ParseParts());
+        await FileUtil.EnsureJsonFileAsync(_path, defaultList);
     }
 
     public async Task<List<Template>> LoadAsync()
-        => await FileUtil.LoadJsonAsync(_path, new List<Template>());
+    {
+        var list = await FileUtil.LoadJsonAsync(_path, new List<Template>());
+        foreach (var t in list) if (t.Parts.Count == 0) t.ParseParts();
+        return list;
+    }
 
-    public async Task SaveAsync(List<Template> list)
-        => await FileUtil.SaveJsonAsync(_path, list);
+    public async Task SaveAsync(List<Template> templates)
+    {
+        templates.ForEach(t => t.ParseParts());
+        await FileUtil.SaveJsonAsync(_path, templates);
+    }
 }

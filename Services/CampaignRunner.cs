@@ -4,202 +4,178 @@ namespace MauiSender.Services;
 
 public class CampaignRunner
 {
-    private readonly DomBridge _dom;
-    private readonly Navigator _nav;
-    private readonly DelayPolicy _delay;
-    private readonly TemplatesRepo _templatesRepo;
-    private readonly BlacklistRepo _blacklistRepo;
-    private readonly LogsRepo _logs;
+    // events / counters
+    public event Action<int, int, int>? CountersChanged; // sent, failed, waiting
 
-    private CancellationTokenSource? _cts;
-    private bool _paused;
     private int _sent;
     private int _failed;
     private int _waiting;
 
-    public event Action<int, int, int>? CountersChanged;
+    public bool IsRunning => _cts != null && !_cts.IsCancellationRequested && !_paused;
+    public bool IsPaused => _paused;
 
-    public bool IsRunning => _cts is not null && !_cts.IsCancellationRequested && !_paused;
+    // dependencies
+    private DomBridge? _dom;
+    private SelectorMap? _selectors;
+    private readonly TemplatesRepo _templates;
+    private readonly BlacklistRepo _blacklist;
+    private readonly LogsRepo _logs;
+    private readonly DelayPolicy _delay;
+    private readonly SettingsService _settings;
 
+    private CancellationTokenSource? _cts;
+    private bool _paused;
+
+    // Full constructor (7 args) for backward compatibility
     public CampaignRunner(
-        DomBridge dom,
-        Navigator nav,
+        TemplatesRepo templates,
+        BlacklistRepo blacklist,
+        LogsRepo logs,
         DelayPolicy delay,
-        TemplatesRepo templatesRepo,
-        BlacklistRepo blacklistRepo,
-        LogsRepo logs)
+        SettingsService settings,
+        object _optionalExport = null,
+        object _optionalSelectorProvider = null)
     {
-        _dom = dom;
-        _nav = nav;
-        _delay = delay;
-        _templatesRepo = templatesRepo;
-        _blacklistRepo = blacklistRepo;
+        _templates = templates;
+        _blacklist = blacklist;
         _logs = logs;
+        _delay = delay;
+        _settings = settings;
     }
 
+    // Attach Dom + selectors
+    public void AttachDom(DomBridge dom) => _dom = dom;
+    public void AttachDom(DomBridge dom, SelectorMap selectors) { _dom = dom; _selectors = selectors; }
+
     public void Pause() => _paused = true;
-
     public void Resume() => _paused = false;
-
+    public void TogglePause() => _paused = !_paused;
     public void Stop()
     {
         _cts?.Cancel();
         _cts = null;
         _paused = false;
-        UpdateCounters();
+        RaiseCounters();
     }
 
+    private void RaiseCounters() => CountersChanged?.Invoke(_sent, _failed, _waiting);
+
+    // Start with settings
     public async Task StartAsync(SettingsModel settings, CancellationToken? externalToken = null)
     {
-        if (_cts is not null) return;
+        if (_dom is null) throw new InvalidOperationException("DomBridge not attached");
+        if (_templates is null) throw new InvalidOperationException("TemplatesRepo not provided");
 
+        if (_cts != null) return; // already started
         _cts = CancellationTokenSource.CreateLinkedTokenSource(externalToken ?? CancellationToken.None);
         _paused = false;
-        _sent = 0;
-        _failed = 0;
+        _sent = 0; _failed = 0; _waiting = 0;
+        RaiseCounters();
 
-        var templates = (await _templatesRepo.LoadAsync())
-            .Where(t => t.Enabled)
-            .ToList();
-        templates.ForEach(t =>
+        var templates = await _templates.LoadAsync();
+        foreach (var t in templates) if (t.Parts.Count == 0) t.ParseParts();
+
+        var blacklistSet = await _blacklist.LoadAsync();
+        var selectors = _selectors ?? new SelectorMap();
+
+        // run loop on background
+        _ = Task.Run(async () =>
         {
-            if (t.Parts.Count == 0) t.ParseParts();
-        });
-
-        var blacklist = await _blacklistRepo.LoadAsync();
-
-        _ = RunLoopAsync(settings, templates, blacklist, _cts.Token);
-    }
-
-    private async Task RunLoopAsync(SettingsModel settings, List<Template> templates, HashSet<string> blacklist, CancellationToken token)
-    {
-        while (!token.IsCancellationRequested)
-        {
-            while (_paused && !token.IsCancellationRequested)
-                await Task.Delay(100, token);
-
-            var ids = await _nav.GetRecipientIdsAsync();
-            var queue = ids.Where(id => !string.IsNullOrWhiteSpace(id) && !blacklist.Contains(id)).ToList();
-            _waiting = queue.Count;
-            UpdateCounters();
-
-            foreach (var recipientId in queue)
+            try
             {
-                if (token.IsCancellationRequested) break;
-                while (_paused && !token.IsCancellationRequested)
-                    await Task.Delay(100, token);
+                while (!_cts.IsCancellationRequested)
+                {
+                    while (_paused && !_cts.IsCancellationRequested) await Task.Delay(200, _cts.Token);
 
-                var template = PickTemplate(templates, settings.TemplateMode);
-                if (template is null) { await Task.Delay(1000, token); continue; }
+                    // get recipients from page
+                    var ids = await _dom.QueryAllIdsAsync(selectors.ListItem, selectors.ListItemIdAttr);
+                    var queue = ids.Where(id => !string.IsNullOrWhiteSpace(id) && !blacklistSet.Contains(id)).ToList();
+                    _waiting = queue.Count;
+                    RaiseCounters();
 
-                bool ok = await SendToRecipientAsync(recipientId, template, token);
-                if (ok) _sent++; else _failed++;
-                _waiting = Math.Max(0, _waiting - 1);
-                UpdateCounters();
+                    if (queue.Count == 0)
+                    {
+                        await Task.Delay(1000, _cts.Token);
+                        continue;
+                    }
 
-                await _delay.MessageDelayAsync();
+                    foreach (var uid in queue)
+                    {
+                        if (_cts.IsCancellationRequested) break;
+                        while (_paused && !_cts.IsCancellationRequested) await Task.Delay(200, _cts.Token);
+
+                        var tpl = PickTemplate(templates, settings.TemplateMode);
+                        if (tpl == null) continue;
+                        bool ok = await SendToRecipientAsync(uid, tpl, selectors, _cts.Token);
+                        if (ok) _sent++; else _failed++;
+                        _waiting = Math.Max(0, _waiting - 1);
+                        RaiseCounters();
+                        await _delay.MessageDelayAsync();
+                    }
+                }
             }
-        }
+            catch (OperationCanceledException) { /* stopped */ }
+            finally { _cts = null; _paused = false; RaiseCounters(); }
+        });
     }
 
     private Template? PickTemplate(List<Template> list, TemplateMode mode)
     {
-        if (list.Count == 0) return null;
-
+        var enabled = list.Where(t => t.Enabled && t.Parts.Any()).ToList();
+        if (!enabled.Any()) return null;
         if (mode == TemplateMode.RoundRobin)
         {
-            var t = list[0];
-            list.RemoveAt(0);
-            list.Add(t);
+            var t = enabled[0];
+            enabled.RemoveAt(0);
+            enabled.Add(t);
             return t;
         }
-
-        // RandomWeighted
-        int sum = list.Where(t => t.Enabled).Sum(t => Math.Max(1, t.Weight));
-        if (sum <= 0) return list[Random.Shared.Next(list.Count)];
-
-        int roll = Random.Shared.Next(1, sum + 1);
-        int acc = 0;
-        foreach (var t in list)
+        // random weighted
+        var sum = enabled.Sum(t => Math.Max(1, t.Weight));
+        var r = Random.Shared.Next(0, Math.Max(1, sum));
+        var acc = 0;
+        foreach (var t in enabled)
         {
-            int w = Math.Max(1, t.Weight);
-            acc += w;
-            if (roll <= acc) return t;
+            acc += Math.Max(1, t.Weight);
+            if (r < acc) return t;
         }
-
-        return list[Random.Shared.Next(list.Count)];
+        return enabled.First();
     }
 
-    private async Task<bool> SendToRecipientAsync(string recipientId, Template template, CancellationToken token)
+    private async Task<bool> SendToRecipientAsync(string uid, Template tpl, SelectorMap selectors, CancellationToken token)
     {
         try
         {
-            // Тут ти можеш клікнути по картці/відкрити чат для конкретного recipientId,
-            // але у нас немає гарантованого селектора елемента за id — це лишається на SelectorMap,
-            // тож відправляємо у відкритий чат (MVP).
-
-            foreach (var (part, index) in template.Parts.Select((p, i) => (p, i)))
+            for (int i = 0; i < tpl.Parts.Count; i++)
             {
-                if (token.IsCancellationRequested) break;
+                var part = tpl.Parts[i];
+                await _delay.HumanSmallAsync();
 
-                await _delay.SmallHumanDelayAsync();
-
-                var fillRes = await _dom.FillAsync(_dom.Selectors.ChatInput, part);
-                if (fillRes is null || !fillRes.Equals("OK", StringComparison.OrdinalIgnoreCase))
+                var fill = await _dom.FillAsync(selectors.ChatInput, part);
+                if (!string.Equals(fill, "OK", StringComparison.OrdinalIgnoreCase))
                 {
-                    await _logs.AppendAsync(new LogEntry
-                    {
-                        UserId = recipientId,
-                        TemplateId = template.Id,
-                        PartIndex = index,
-                        Status = "FAIL",
-                        Error = fillRes ?? "Fill failed"
-                    });
+                    await _logs.AppendAsync(new LogEntry { UserId = uid, TemplateId = tpl.Id, PartIndex = i, Ts = DateTime.UtcNow, Status = "FAIL", Error = fill });
                     return false;
                 }
 
-                await _delay.SmallHumanDelayAsync();
+                await _delay.HumanSmallAsync();
 
-                var clickRes = await _dom.ClickAsync(_dom.Selectors.ChatSend);
-                if (clickRes is null || !clickRes.Equals("OK", StringComparison.OrdinalIgnoreCase))
+                var click = await _dom.ClickAsync(selectors.ChatSend);
+                if (!string.Equals(click, "OK", StringComparison.OrdinalIgnoreCase))
                 {
-                    await _logs.AppendAsync(new LogEntry
-                    {
-                        UserId = recipientId,
-                        TemplateId = template.Id,
-                        PartIndex = index,
-                        Status = "FAIL",
-                        Error = clickRes ?? "Click failed"
-                    });
+                    await _logs.AppendAsync(new LogEntry { UserId = uid, TemplateId = tpl.Id, PartIndex = i, Ts = DateTime.UtcNow, Status = "FAIL", Error = click });
                     return false;
                 }
 
-                await _logs.AppendAsync(new LogEntry
-                {
-                    UserId = recipientId,
-                    TemplateId = template.Id,
-                    PartIndex = index,
-                    Status = "OK"
-                });
-
+                await _logs.AppendAsync(new LogEntry { UserId = uid, TemplateId = tpl.Id, PartIndex = i, Ts = DateTime.UtcNow, Status = "OK" });
                 await _delay.PartDelayAsync();
             }
-
             return true;
         }
         catch (Exception ex)
         {
-            await _logs.AppendAsync(new LogEntry
-            {
-                UserId = recipientId,
-                TemplateId = template.Id,
-                PartIndex = -1,
-                Status = "FAIL",
-                Error = ex.Message
-            });
+            await _logs.AppendAsync(new LogEntry { UserId = uid, TemplateId = tpl.Id, PartIndex = -1, Ts = DateTime.UtcNow, Status = "FAIL", Error = ex.Message });
             return false;
         }
     }
-
-    private void UpdateCounters() => CountersChanged?.Invoke(_sent, _failed, _waiting);
 }

@@ -1,7 +1,6 @@
 ﻿using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
-using System.Text.RegularExpressions;
 using MauiSender.Models;
 using MauiSender.Services;
 
@@ -10,114 +9,114 @@ namespace MauiSender.ViewModels;
 public class SenderViewModel : INotifyPropertyChanged
 {
     public event PropertyChangedEventHandler? PropertyChanged;
+    private void Notify([CallerMemberName] string? n = null) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(n));
 
-    private readonly SettingsService _settings;
-    private readonly TemplatesRepo _templatesRepo;
     private readonly AccountsService _accounts;
-    private readonly BlacklistRepo _blacklist;
+    private readonly TemplatesRepo _templates;
+    private readonly SelectorMapService _selectorService;
+    private readonly SettingsService _settings;
+    private readonly CampaignRunner _runner;
     private readonly LogsRepo _logs;
 
     private DomBridge? _dom;
-    private Navigator? _navigator;
-    private CampaignRunner? _runner;
-    private SettingsModel _cfg = new();
+    private SelectorMap? _selectors;
 
     public ObservableCollection<Account> Accounts { get; } = new();
     public ObservableCollection<Template> Templates { get; } = new();
 
     private int _sent;
-    public int Sent { get => _sent; set { _sent = value; OnPropertyChanged(); } }
+    public int Sent { get => _sent; private set { _sent = value; Notify(); } }
 
     private int _failed;
-    public int Failed { get => _failed; set { _failed = value; OnPropertyChanged(); } }
+    public int Failed { get => _failed; private set { _failed = value; Notify(); } }
 
     private int _waiting;
-    public int Waiting { get => _waiting; set { _waiting = value; OnPropertyChanged(); } }
+    public int Waiting { get => _waiting; private set { _waiting = value; Notify(); } }
 
     public SenderViewModel(
-        SettingsService settings,
-        TemplatesRepo templatesRepo,
         AccountsService accounts,
-        BlacklistRepo blacklist,
+        TemplatesRepo templates,
+        SelectorMapService selectorService,
+        SettingsService settings,
+        CampaignRunner runner,
         LogsRepo logs)
     {
-        _settings = settings;
-        _templatesRepo = templatesRepo;
         _accounts = accounts;
-        _blacklist = blacklist;
+        _templates = templates;
+        _selectorService = selectorService;
+        _settings = settings;
+        _runner = runner;
         _logs = logs;
     }
 
-    public async Task LoadAsync()
+    public async Task InitializeAsync()
     {
-        _cfg = await _settings.LoadAsync();
-
+        await _accounts.EnsureAsync();
+        var accs = await _accounts.LoadAsync();
         Accounts.Clear();
-        foreach (var a in await _accounts.LoadAsync())
-            Accounts.Add(a);
+        foreach (var a in accs) Accounts.Add(a);
 
+        await _templates.EnsureAsync();
+        var tpls = await _templates.LoadAsync();
         Templates.Clear();
-        foreach (var t in await _templatesRepo.LoadAsync())
+        foreach (var t in tpls)
         {
             if (t.Parts.Count == 0) t.ParseParts();
             Templates.Add(t);
         }
-    }
 
-    public void AttachDom(WebView webView, SelectorMap selectors, SettingsModel? effectiveSettings = null)
-    {
-        _dom = new DomBridge(webView);
-        _dom.AttachSelectors(selectors);
-        _navigator = new Navigator(_dom);
+        await _selectorService.EnsureAsync();
+        _selectors = await _selectorService.LoadAsync();
 
-        var cfg = effectiveSettings ?? _cfg;
-        var delay = new DelayPolicy(cfg.BaseIntervalSec, cfg.PartIntervalSec, cfg.JitterPct);
+        var settings = await _settings.LoadAsync();
 
-        _runner = new CampaignRunner(_dom, _navigator, delay, _templatesRepo, _blacklist, _logs);
+        // Attach runner counters
         _runner.CountersChanged += (s, f, w) =>
         {
             MainThread.BeginInvokeOnMainThread(() =>
             {
-                Sent = s;
-                Failed = f;
-                Waiting = w;
+                Sent = s; Failed = f; Waiting = w;
             });
         };
     }
 
-    public async Task StartAsync()
+    // Overloads for AttachDom to satisfy different call sites
+    public void AttachDom(WebView webView)
     {
-        if (_runner is null) return;
-        await _runner.StartAsync(_cfg);
+        _dom = new DomBridge(webView);
+        if (_selectors != null) _dom.AttachSelectors(_selectors);
+        _runner.AttachDom(_dom!, _selectors ?? new SelectorMap());
     }
 
-    public void Pause() => _runner?.Pause();
+    public void AttachDom(DomBridge dom, SelectorMap selectors)
+    {
+        _dom = dom;
+        _selectors = selectors;
+        _dom.AttachSelectors(selectors);
+        _runner.AttachDom(dom, selectors);
+    }
 
-    public void Resume() => _runner?.Resume();
+    public async Task StartAsync()
+    {
+        var cfg = await _settings.LoadAsync();
+        await _runner.StartAsync(cfg);
+    }
 
-    public void Stop() => _runner?.Stop();
+    public void Pause() => _runner.Pause();
+    public void Resume() => _runner.Resume();
+    public void Stop() => _runner.Stop();
 
     public async Task AddAccountAsync(string login, string password)
     {
-        if (string.IsNullOrWhiteSpace(login) || string.IsNullOrWhiteSpace(password))
-            return;
-
-        // простенька валідація логіна
-        if (!Regex.IsMatch(login, @"^[^@\s]+@[^@\s]+\.[^@\s]+$") && login.Any(char.IsWhiteSpace))
-            return;
-
-        var a = new Account { Login = login.Trim(), Password = password };
-        await _accounts.AddAsync(a);
-        Accounts.Add(a);
+        var acc = new Account { Login = login.Trim(), Password = password };
+        await _accounts.AddAsync(acc);
+        Accounts.Add(acc);
     }
 
-    public async Task RemoveAccountAsync(Account? a)
+    public async Task RemoveAccountAsync(Account a)
     {
         if (a is null) return;
-        await _accounts.RemoveAsync(a.Login);
+        await _accounts.RemoveByLoginAsync(a.Login);
         Accounts.Remove(a);
     }
-
-    protected void OnPropertyChanged([CallerMemberName] string? name = null)
-        => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
 }
