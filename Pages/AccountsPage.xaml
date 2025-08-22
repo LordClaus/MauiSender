@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="MauiSender.Pages.AccountsPage"
+             Title="AccountsPage">
+    <Grid RowDefinitions="Auto,*">
+        <!-- Верхня панель керування акаунтами -->
+        <Grid Padding="10" ColumnDefinitions="*,Auto,Auto,Auto" RowDefinitions="Auto,Auto">
+            <Entry x:Name="LoginEntry" Placeholder="Логін" Grid.Row="0" Grid.Column="0" />
+            <Entry x:Name="PasswordEntry" Placeholder="Пароль" IsPassword="True" Grid.Row="0" Grid.Column="1" />
+            <Button Text="Додати" Grid.Row="0" Grid.Column="2" Clicked="OnAddClicked" />
+            <Button Text="Видалити" Grid.Row="0" Grid.Column="3" Clicked="OnDeleteClicked" />
+
+            <Picker x:Name="AccountsPicker"
+              Title="Оберіть акаунт"
+              Grid.Row="1" Grid.ColumnSpan="4"
+              ItemDisplayBinding="{Binding Login}" />
+        </Grid>
+
+        <!-- WebView одразу відкриває чат-URL -->
+        <WebView x:Name="ChatWeb"
+             Grid.Row="1"
+             Source="https://goldenbride.net/chat#!CHAT;"
+             Navigated="OnChatNavigated" />
+    </Grid>
+</ContentPage>
