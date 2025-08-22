@@ -17,8 +17,15 @@ public class SelectorMap
     public static SelectorMap LoadFromEmbedded()
     {
         using var s = Assembly.GetExecutingAssembly().GetManifestResourceStream("selectorMap.json");
-        using var r = new StreamReader(s!);
-        var json = r.ReadToEnd();
-        return new SelectorMap { Map = JsonSerializer.Deserialize<Dictionary<string, string>>(json)! };
+        if (s != null)
+        {
+            using var r = new StreamReader(s!);
+            var json = r.ReadToEnd();
+            return new SelectorMap { Map = JsonSerializer.Deserialize<Dictionary<string, string>>(json)! };
+        }
+        else
+        {
+            return null;
+        }
     }
 }
