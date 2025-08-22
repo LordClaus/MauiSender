@@ -1,16 +1,12 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace MauiSender.Models;
+﻿namespace MauiSender.Models;
 
 public class SettingsModel
 {
-    public int BaseIntervalSec { get; set; } = 45;
-    public int PartIntervalSec { get; set; } = 45;
-    public int JitterPct { get; set; } = 15;
+    public int MessageIntervalSec { get; set; } = 60;
+    public int PartIntervalSec { get; set; } = 60;
+    public int JitterPct { get; set; } = 10;
     public string TemplateMode { get; set; } = "randomWeighted";
-    public string BaseUrl { get; set; } = "https://goldenbride.com/";
+    public int MaxFailuresBeforePause { get; set; } = 3;
+    public bool StopOnCaptcha { get; set; } = true;
+    public string Language { get; set; } = "UA";
 }

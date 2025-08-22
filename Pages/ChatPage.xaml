@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="MauiSender.Pages.ChatPage"
+             Title="ChatPage">
+    <Grid RowDefinitions="Auto,*" Padding="8">
+        <Grid RowDefinitions="Auto" ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="8" Padding="6" BackgroundColor="#F5F5F5">
+            <Picker Grid.Column="0" Title="Шаблон" ItemsSource="{Binding TemplateNames}" SelectedItem="{Binding SelectedTemplateName}" WidthRequest="200" />
+            <HorizontalStackLayout Grid.Column="1" Spacing="8">
+                <VerticalStackLayout>
+                    <Label Text="Інтервал (сек)" FontSize="12"/>
+                    <Entry Keyboard="Numeric" WidthRequest="80" Text="{Binding MessageIntervalSec}" />
+                </VerticalStackLayout>
+                <VerticalStackLayout>
+                    <Label Text="Part delay (сек)" FontSize="12"/>
+                    <Entry Keyboard="Numeric" WidthRequest="80" Text="{Binding PartIntervalSec}" />
+                </VerticalStackLayout>
+                <VerticalStackLayout>
+                    <Label Text="Jitter (%)" FontSize="12"/>
+                    <Entry Keyboard="Numeric" WidthRequest="80" Text="{Binding JitterPct}" />
+                </VerticalStackLayout>
+                <VerticalStackLayout>
+                    <Label Text="Ротація" FontSize="12"/>
+                    <Picker WidthRequest="140" ItemsSource="{Binding RotationModes}" SelectedItem="{Binding SelectedRotationMode}" />
+                </VerticalStackLayout>
+            </HorizontalStackLayout>
+            <Button Grid.Column="2" Text="Старт" Command="{Binding StartCommand}" />
+            <Button Grid.Column="3" Text="Пауза/Продовжити" Command="{Binding PauseResumeCommand}" />
+            <Button Grid.Column="4" Text="Стоп" Command="{Binding StopCommand}" />
+            <Button Grid.Column="5" Text="Шаблони" Command="{Binding ManageTemplatesCommand}" />
+            <Button Grid.Column="6" Text="BlackList" Command="{Binding ManageBlacklistCommand}" />
+        </Grid>
+
+        <Grid Grid.Row="1" RowDefinitions="Auto,Auto,*">
+            <HorizontalStackLayout Padding="6" Spacing="16">
+                <Label Text="{Binding CountersText}" />
+                <Label Text="{Binding ActiveTemplateText}" />
+                <Label Text="{Binding NextRecipientText}" />
+            </HorizontalStackLayout>
+
+            <Label Grid.Row="1" Text="{Binding CurrentAccountText}" Padding="6" />
+
+            <WebView x:Name="ChatWeb" Grid.Row="2" Source="https://goldenbride.net/chat#!CHAT;" Navigated="OnChatNavigated" />
+        </Grid>
+    </Grid>
+</ContentPage>

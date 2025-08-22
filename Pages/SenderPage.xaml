@@ -4,16 +4,32 @@
              x:Class="MauiSender.Pages.SenderPage"
              Title="SenderPage">
     <Grid RowDefinitions="Auto,*">
-        <!-- Наша верхня панель (спрощений варіант) -->
-        <Grid BackgroundColor="#1f2630" Padding="8" ColumnDefinitions="Auto,Auto,Auto,*,Auto">
-            <Label Text="Шаблони" TextColor="White" Margin="0,0,12,0" VerticalOptions="Center" />
-            <Picker x:Name="TemplatePicker" WidthRequest="220" />
-            <Label Text="Інтервал (сек)" TextColor="White" Margin="12,0,8,0" VerticalOptions="Center" />
-            <Entry x:Name="IntervalEntry" WidthRequest="80" Text="45" Keyboard="Numeric" />
-            <Button Text="Start" Clicked="OnStartClicked" Margin="12,0,0,0" />
+        <!-- Top control bar -->
+        <Grid Padding="8" ColumnDefinitions="*,Auto,100,100,100,Auto,Auto,Auto" BackgroundColor="{DynamicResource SystemColorControlBackground}">
+            <Picker Title="Шаблон" ItemsSource="{Binding Templates}" ItemDisplayBinding="{Binding Name}" SelectedItem="{Binding SelectedTemplate}" />
+            <Picker Grid.Column="1" Title="Режим" ItemsSource="{Binding TemplateModes}" SelectedItem="{Binding TemplateMode}" />
+
+            <StackLayout Grid.Column="2">
+                <Label FontSize="12" Text="Інтервал (сек)" />
+                <Entry Text="{Binding BaseIntervalSec}" Keyboard="Numeric" />
+            </StackLayout>
+
+            <StackLayout Grid.Column="3">
+                <Label FontSize="12" Text="Частина (сек)" />
+                <Entry Text="{Binding PartIntervalSec}" Keyboard="Numeric" />
+            </StackLayout>
+
+            <StackLayout Grid.Column="4">
+                <Label FontSize="12" Text="Jitter (%)" />
+                <Entry Text="{Binding JitterPct}" Keyboard="Numeric" />
+            </StackLayout>
+
+            <Button Grid.Column="5" Text="Старт" Command="{Binding StartCommand}" />
+            <Button Grid.Column="6" Text="{Binding PauseResumeText}" Command="{Binding PauseResumeCommand}" />
+            <Button Grid.Column="7" Text="Стоп" Command="{Binding StopCommand}" />
         </Grid>
 
-        <!-- WebView з чатом -->
-        <WebView x:Name="ChatWeb" Grid.Row="1" Source="https://goldenbride.net/chat#!CHAT;" />
+        <!-- WebView (workspace) -->
+        <WebView x:Name="ChatWeb" Grid.Row="1" Source="https://goldenbride.net/chat#!CHAT;" Navigated="OnChatNavigated" />
     </Grid>
 </ContentPage>

@@ -1,61 +1,30 @@
-﻿using System.Text.Json;
+﻿using System.Collections.Generic;
+using System.IO;
+using System.Text.Json;
 using MauiSender.Models;
 
-namespace MauiSender.Services;
-
-public class AccountService
+namespace MauiSender.Services
 {
-    private readonly string _filePath;
-    private List<UserAccount> _accounts = new();
-
-    public AccountService()
+    public class AccountService
     {
-        // зберігаємо у локальній папці застосунку
-        _filePath = Path.Combine(FileSystem.AppDataDirectory, "accounts.json");
-        Load();
-    }
+        private const string FileName = "accounts.json";
 
-    public IReadOnlyList<UserAccount> GetAll() => _accounts;
-
-    public void Add(UserAccount acc)
-    {
-        _accounts.Add(acc);
-        Save();
-    }
-
-    public void Remove(UserAccount acc)
-    {
-        _accounts.Remove(acc);
-        Save();
-    }
-
-    public void Save()
-    {
-        var json = JsonSerializer.Serialize(_accounts, new JsonSerializerOptions { WriteIndented = true });
-        Directory.CreateDirectory(Path.GetDirectoryName(_filePath)!);
-        File.WriteAllText(_filePath, json);
-    }
-
-    private void Load()
-    {
-        Directory.CreateDirectory(Path.GetDirectoryName(_filePath)!);
-        if (!File.Exists(_filePath))
+        public List<Account> LoadAccounts()
         {
-            _accounts = new List<UserAccount>();
-            Save(); // створюємо ПУСТИЙ файл одразу
-            return;
+            if (!File.Exists(FileName))
+            {
+                File.WriteAllText(FileName, "[]");
+                return new List<Account>();
+            }
+
+            var json = File.ReadAllText(FileName);
+            return JsonSerializer.Deserialize<List<Account>>(json) ?? new List<Account>();
         }
 
-        try
+        public void SaveAccounts(List<Account> accounts)
         {
-            var json = File.ReadAllText(_filePath);
-            _accounts = JsonSerializer.Deserialize<List<UserAccount>>(json) ?? new List<UserAccount>();
-        }
-        catch
-        {
-            // якщо файл битий — перезаписати порожнім
-            _accounts = new List<UserAccount>();
-            Save();
+            var json = JsonSerializer.Serialize(accounts, new JsonSerializerOptions { WriteIndented = true });
+            File.WriteAllText(FileName, json);
         }
     }
 }

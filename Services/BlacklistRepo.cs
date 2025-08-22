@@ -1,25 +1,38 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿// MauiSender/Services/BlacklistRepo.cs
+using System.Text.Json;
 
 namespace MauiSender.Services;
 
 public class BlacklistRepo
 {
-    private readonly string _path;
-    public BlacklistRepo()
+    private readonly string _file;
+    private HashSet<string> _ids = new();
+
+    public BlacklistRepo(FileSystemService fs)
     {
-        _path = Path.Combine(FileSystem.AppDataDirectory, "blacklist.txt");
-        if (!File.Exists(_path)) File.WriteAllText(_path, "");
+        _file = fs.PathFor("blacklist.json");
     }
 
-    public bool Contains(string id) => Load().Contains(id);
+    public async Task<HashSet<string>> LoadAsync()
+    {
+        if (!File.Exists(_file))
+        {
+            await File.WriteAllTextAsync(_file, "[]");
+            _ids = new();
+            return _ids;
+        }
+        var json = await File.ReadAllTextAsync(_file);
+        _ids = JsonSerializer.Deserialize<HashSet<string>>(json) ?? new();
+        return _ids;
+    }
 
-    public void ReplaceAll(IEnumerable<string> ids)
-        => File.WriteAllLines(_path, ids.Distinct().OrderBy(x => x));
+    public async Task SaveAsync()
+    {
+        var json = JsonSerializer.Serialize(_ids, new JsonSerializerOptions { WriteIndented = true });
+        await File.WriteAllTextAsync(_file, json);
+    }
 
-    private HashSet<string> Load()
-        => File.ReadAllLines(_path).ToHashSet(StringComparer.OrdinalIgnoreCase);
+    public bool Contains(string id) => _ids.Contains(id);
+    public void Add(string id) => _ids.Add(id);
+    public void Remove(string id) => _ids.Remove(id);
 }

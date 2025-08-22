@@ -1,36 +1,24 @@
-﻿using SQLite;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿// MauiSender/Services/LogsRepo.cs
+using SQLite;
 using MauiSender.Models;
 
 namespace MauiSender.Services;
 
 public class LogsRepo
 {
-    private readonly SQLiteConnection _db;
-    public LogsRepo()
+    private readonly SQLiteAsyncConnection _db;
+
+    public LogsRepo(FileSystemService fs)
     {
-        var dbPath = Path.Combine(FileSystem.AppDataDirectory, "gbsender.db3");
-        _db = new SQLiteConnection(dbPath);
-        _db.CreateTable<LogEntry>();
+        var path = fs.PathFor("logs.db3");
+        _db = new SQLiteAsyncConnection(path);
+        _db.CreateTableAsync<LogEntry>().Wait();
     }
 
-    public void Add(LogEntry e) => _db.Insert(e);
+    public Task<int> AddAsync(LogEntry entry) => _db.InsertAsync(entry);
 
-    public async Task<string> ExportCsvAsync(string? fileName = null)
-    {
-        fileName ??= $"logs_{DateTime.UtcNow:yyyyMMdd_HHmmss}.csv";
-        var path = Path.Combine(FileSystem.AppDataDirectory, fileName);
-        var sb = new StringBuilder();
-        sb.AppendLine("Id,UserId,TemplateId,PartIndex,Timestamp,Status,Error");
-        foreach (var row in _db.Table<LogEntry>().OrderBy(x => x.Id))
-        {
-            sb.AppendLine($"{row.Id},{row.UserId},{row.TemplateId},{row.PartIndex},{row.Timestamp:o},{row.Status},\"{row.Error?.Replace('\"', '\'')}\"");
-        }
-        await File.WriteAllTextAsync(path, sb.ToString(), Encoding.UTF8);
-        return path;
-    }
+    public Task<List<LogEntry>> GetByDateAsync(DateTime from, DateTime to) =>
+        _db.Table<LogEntry>()
+           .Where(l => l.Ts >= from && l.Ts <= to)
+           .ToListAsync();
 }

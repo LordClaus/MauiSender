@@ -1,26 +1,21 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Text.Json.Serialization;
-using System.Threading.Tasks;
-
-namespace MauiSender.Models;
+﻿namespace MauiSender.Models;
 
 public class Template
 {
-    public int Id { get; set; }
-    public string Name { get; set; } = "Новий";
-    public string RawText { get; set; } = string.Empty;
+    public string Id { get; set; } = Guid.NewGuid().ToString("N");
+    public string Name { get; set; } = "Новий шаблон";
+    public string Text { get; set; } = "";
     public bool Enabled { get; set; } = true;
     public int Weight { get; set; } = 1;
+    public List<string> Parts { get; set; } = new();
 
-    [JsonIgnore]
-    public string[] Parts =>
-        RawText
-            .Replace("\r\n", "\n")
-            .Split(new[] { "\n---\n", "---" }, StringSplitOptions.None)
-            .Select(p => p?.Trim() ?? "")
+    public void ParseParts()
+    {
+        var raw = Text.Replace("\r\n", "\n");
+        var parts = raw.Split(new[] { "\n---\n", "---" }, StringSplitOptions.None)
+            .Select(p => p.Trim())
             .Where(p => !string.IsNullOrWhiteSpace(p))
-            .ToArray();
+            .ToList();
+        Parts = parts;
+    }
 }

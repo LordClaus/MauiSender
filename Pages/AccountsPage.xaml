@@ -3,24 +3,40 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              x:Class="MauiSender.Pages.AccountsPage"
              Title="AccountsPage">
-    <Grid RowDefinitions="Auto,*">
-        <!-- Верхня панель керування акаунтами -->
-        <Grid Padding="10" ColumnDefinitions="*,Auto,Auto,Auto" RowDefinitions="Auto,Auto">
-            <Entry x:Name="LoginEntry" Placeholder="Логін" Grid.Row="0" Grid.Column="0" />
-            <Entry x:Name="PasswordEntry" Placeholder="Пароль" IsPassword="True" Grid.Row="0" Grid.Column="1" />
-            <Button Text="Додати" Grid.Row="0" Grid.Column="2" Clicked="OnAddClicked" />
-            <Button Text="Видалити" Grid.Row="0" Grid.Column="3" Clicked="OnDeleteClicked" />
+    <Grid RowDefinitions="Auto,*,Auto" Padding="12">
+        <VerticalStackLayout Spacing="8">
+            <Label Text="Список акаунтів (зберігаються у accounts.json)" FontAttributes="Bold" />
+            <Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="8">
+                <Entry Grid.Column="0" Placeholder="Логін (email або ID)" Text="{Binding NewLogin}" />
+                <Entry Grid.Column="1" Placeholder="Пароль" IsPassword="True" WidthRequest="220" Text="{Binding NewPassword}" />
+                <Button Grid.Column="2" Text="Додати" Command="{Binding AddAccountCommand}" />
+                <Button Grid.Column="3" Text="Зберегти" Command="{Binding SaveCommand}" />
+            </Grid>
+        </VerticalStackLayout>
 
-            <Picker x:Name="AccountsPicker"
-              Title="Оберіть акаунт"
-              Grid.Row="1" Grid.ColumnSpan="4"
-              ItemDisplayBinding="{Binding Login}" />
-        </Grid>
+        <CollectionView Grid.Row="1"
+                        SelectionMode="Single"
+                        ItemsSource="{Binding Accounts}"
+                        SelectedItem="{Binding SelectedAccount}">
+            <CollectionView.ItemTemplate>
+                <DataTemplate>
+                    <Grid Padding="8" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+                        <VerticalStackLayout>
+                            <Label Text="{Binding Login}" FontAttributes="Bold" />
+                            <Label Text="{Binding MaskedPassword}" FontAttributes="Italic" FontSize="12" />
+                        </VerticalStackLayout>
+                        <Button Grid.Column="1" Text="Видалити" Command="{Binding Source={RelativeSource AncestorType={x:Type vm:AccountsViewModel}}, Path=RemoveAccountCommand}" CommandParameter="{Binding .}" />
+                        <Button Grid.Column="2" Text="Відкрити чат" Command="{Binding Source={RelativeSource AncestorType={x:Type vm:AccountsViewModel}}, Path=OpenChatCommand}" CommandParameter="{Binding .}" />
+                    </Grid>
+                </DataTemplate>
+            </CollectionView.ItemTemplate>
+        </CollectionView>
 
-        <!-- WebView одразу відкриває чат-URL -->
-        <WebView x:Name="ChatWeb"
-             Grid.Row="1"
-             Source="https://goldenbride.net/chat#!CHAT;"
-             Navigated="OnChatNavigated" />
+        <Border Grid.Row="2" StrokeThickness="1" Stroke="#ddd" Padding="8" StrokeShape="RoundRectangle 12">
+            <VerticalStackLayout>
+                <Label Text="Вбудований перегляд (https://goldenbride.net) для реєстрації/перевірки" />
+                <WebView HeightRequest="320" Source="https://goldenbride.net" />
+            </VerticalStackLayout>
+        </Border>
     </Grid>
 </ContentPage>
