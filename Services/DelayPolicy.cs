@@ -1,4 +1,5 @@
-﻿namespace MauiSender.Services;
+﻿// Services/DelayPolicy.cs
+namespace MauiSender.Services;
 
 public class DelayPolicy
 {

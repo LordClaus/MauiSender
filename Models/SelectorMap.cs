@@ -1,10 +1,8 @@
-﻿using System.Text.Json.Serialization;
+﻿// Models/SelectorMap.cs
+using System.Text.Json.Serialization;
 
 namespace MauiSender.Models;
 
-/// <summary>
-/// ЄДИНА модель селекторів. Не дублювати в Services.
-/// </summary>
 public class SelectorMap
 {
     [JsonPropertyName("list.item")]

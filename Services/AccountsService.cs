@@ -1,4 +1,5 @@
-﻿using MauiSender.Models;
+﻿// Services/AccountsService.cs
+using MauiSender.Models;
 
 namespace MauiSender.Services;
 
@@ -7,13 +8,19 @@ public class AccountsService
     private readonly string _path = FileUtil.PathInData("accounts.json");
 
     public async Task EnsureAsync()
-        => await FileUtil.EnsureJsonFileAsync(_path, new List<Account>());
+    {
+        await FileUtil.EnsureJsonFileAsync(_path, new List<Account>());
+    }
 
     public async Task<List<Account>> LoadAsync()
-        => await FileUtil.LoadJsonAsync(_path, new List<Account>());
+    {
+        return await FileUtil.LoadJsonAsync(_path, new List<Account>());
+    }
 
     public async Task SaveAsync(List<Account> accounts)
-        => await FileUtil.SaveJsonAsync(_path, accounts);
+    {
+        await FileUtil.SaveJsonAsync(_path, accounts);
+    }
 
     public async Task AddAsync(Account acc)
     {

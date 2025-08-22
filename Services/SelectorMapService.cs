@@ -4,11 +4,7 @@ namespace MauiSender.Services;
 
 public class SelectorMapService
 {
-    private readonly string _path;
-    public SelectorMapService()
-    {
-        _path = FileUtil.PathInData("selectors.json");
-    }
+    private readonly string _path = FileUtil.PathInData("selectors.json");
 
     public async Task EnsureAsync()
     {

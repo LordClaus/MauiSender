@@ -1,64 +1,86 @@
 ﻿// MauiSender/ViewModels/AccountsViewModel.cs
-using System.Collections.ObjectModel;
-using System.Windows.Input;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using MauiSender.Models;
 using MauiSender.Pages;
 using MauiSender.Services;
+using System.Collections.ObjectModel;
+using System.ComponentModel;
+using System.Runtime.CompilerServices;
+using System.Windows.Input;
 
 namespace MauiSender.ViewModels;
 
-public partial class AccountsViewModel : ObservableObject
+public partial class AccountsViewModel : INotifyPropertyChanged
 {
-    private readonly AccountsService _service;
+    private readonly AccountsService _accountsService;
 
-    [ObservableProperty] private ObservableCollection<Account> accounts = new();
-    [ObservableProperty] private string newLogin = "";
-    [ObservableProperty] private string newPassword = "";
-    [ObservableProperty] private Account? selectedAccount;
+    public ObservableCollection<Account> Accounts { get; } = new();
 
-    public AccountsViewModel(AccountsService service)
+    private string _newLogin = string.Empty;
+    public string NewLogin
     {
-        _service = service;
-        _ = LoadAsync();
+        get => _newLogin;
+        set { _newLogin = value; OnPropertyChanged(); }
     }
 
-    private async Task LoadAsync()
+    private string _newPassword = string.Empty;
+    public string NewPassword
     {
-        Accounts = await _service.LoadAsync();
+        get => _newPassword;
+        set { _newPassword = value; OnPropertyChanged(); }
     }
 
-    [RelayCommand]
-    private async Task AddAccount()
+    private Account? _selectedAccount;
+    public Account? SelectedAccount
     {
-        if (string.IsNullOrWhiteSpace(NewLogin) || string.IsNullOrWhiteSpace(NewPassword)) return;
-        Accounts.Add(new Account { Login = NewLogin.Trim(), Password = NewPassword });
-        NewLogin = "";
-        NewPassword = "";
-        await _service.SaveAsync(Accounts);
+        get => _selectedAccount;
+        set { _selectedAccount = value; OnPropertyChanged(); }
     }
 
-    [RelayCommand]
-    private async Task RemoveAccount(Account acc)
+    public AccountsViewModel(AccountsService accountsService)
     {
-        Accounts.Remove(acc);
-        await _service.SaveAsync(Accounts);
+        _accountsService = accountsService ?? throw new ArgumentNullException(nameof(accountsService));
     }
 
-    [RelayCommand]
-    private async Task Save()
+    public async Task InitializeAsync()
     {
-        await _service.SaveAsync(Accounts);
+        await _accountsService.EnsureAsync();
+        Accounts.Clear();
+        var list = await _accountsService.LoadAsync();
+        foreach (var a in list) Accounts.Add(a);
     }
 
-    [RelayCommand]
-    private async Task OpenChat(Account acc)
+    public async Task AddAsync()
     {
-        var page = Application.Current!.Services.GetRequiredService<ChatPage>();
-        await Application.Current!.MainPage!.Navigation.PushAsync(page);
-        var vm = (ChatViewModel)page.BindingContext;
-        vm.SetCurrentAccount(acc);
-        await vm.EnsureInitAsync();
+        var login = (NewLogin ?? string.Empty).Trim();
+        var pass = NewPassword ?? string.Empty;
+
+        if (string.IsNullOrWhiteSpace(login))
+            return;
+
+        var acc = new Account { Login = login, Password = pass };
+        await _accountsService.AddAsync(acc);
+        Accounts.Add(acc);
+        NewLogin = string.Empty;
+        NewPassword = string.Empty;
     }
+
+    public async Task RemoveSelectedAsync()
+    {
+        if (SelectedAccount == null) return;
+        await _accountsService.RemoveByLoginAsync(SelectedAccount.Login);
+        Accounts.Remove(SelectedAccount);
+        SelectedAccount = null;
+    }
+
+    public async Task SaveAllAsync()
+    {
+        var list = Accounts.ToList();
+        await _accountsService.SaveAsync(list);
+    }
+
+    public event PropertyChangedEventHandler? PropertyChanged;
+    private void OnPropertyChanged([CallerMemberName] string? n = null) =>
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(n));
 }

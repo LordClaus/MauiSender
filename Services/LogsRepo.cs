@@ -1,6 +1,6 @@
-﻿using MauiSender.Models;
+﻿// Services/LogsRepo.cs
 using System.Text;
-using System.Globalization;
+using MauiSender.Models;
 
 namespace MauiSender.Services;
 
@@ -9,15 +9,19 @@ public class LogsRepo
     private readonly string _path = FileUtil.PathInData("logs.json");
 
     public async Task EnsureAsync()
-        => await FileUtil.EnsureJsonFileAsync(_path, new List<LogEntry>());
+    {
+        await FileUtil.EnsureJsonFileAsync(_path, new List<LogEntry>());
+    }
 
     public async Task<List<LogEntry>> LoadAsync()
-        => await FileUtil.LoadJsonAsync(_path, new List<LogEntry>());
+    {
+        return await FileUtil.LoadJsonAsync(_path, new List<LogEntry>());
+    }
 
-    public async Task AppendAsync(LogEntry e)
+    public async Task AppendAsync(LogEntry entry)
     {
         var list = await LoadAsync();
-        list.Add(e);
+        list.Add(entry);
         await FileUtil.SaveJsonAsync(_path, list);
     }
 
@@ -25,6 +29,7 @@ public class LogsRepo
     {
         var list = await LoadAsync();
         var filtered = list.Where(l => l.Ts >= from && l.Ts <= to).ToList();
+
         var sb = new StringBuilder();
         sb.AppendLine("Id,UserId,TemplateId,PartIndex,Ts,Status,Error");
         foreach (var l in filtered)
@@ -32,6 +37,7 @@ public class LogsRepo
             var err = l.Error?.Replace("\"", "\"\"") ?? "";
             sb.AppendLine($"\"{l.Id}\",\"{l.UserId}\",\"{l.TemplateId}\",{l.PartIndex},\"{l.Ts:o}\",\"{l.Status}\",\"{err}\"");
         }
+
         await File.WriteAllTextAsync(filePath, sb.ToString(), Encoding.UTF8);
         return filePath;
     }

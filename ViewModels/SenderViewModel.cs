@@ -1,16 +1,14 @@
-﻿using System.Collections.ObjectModel;
-using System.ComponentModel;
-using System.Runtime.CompilerServices;
+﻿// ViewModels/SenderViewModel.cs
 using MauiSender.Models;
 using MauiSender.Services;
+using System.Collections.ObjectModel;
+using System.ComponentModel;
+using System.Runtime.CompilerServices;
 
 namespace MauiSender.ViewModels;
 
 public class SenderViewModel : INotifyPropertyChanged
 {
-    public event PropertyChangedEventHandler? PropertyChanged;
-    private void Notify([CallerMemberName] string? n = null) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(n));
-
     private readonly AccountsService _accounts;
     private readonly TemplatesRepo _templates;
     private readonly SelectorMapService _selectorService;
@@ -52,25 +50,22 @@ public class SenderViewModel : INotifyPropertyChanged
     public async Task InitializeAsync()
     {
         await _accounts.EnsureAsync();
-        var accs = await _accounts.LoadAsync();
         Accounts.Clear();
+        var accs = await _accounts.LoadAsync();
         foreach (var a in accs) Accounts.Add(a);
 
         await _templates.EnsureAsync();
-        var tpls = await _templates.LoadAsync();
         Templates.Clear();
+        var tpls = await _templates.LoadAsync();
         foreach (var t in tpls)
         {
             if (t.Parts.Count == 0) t.ParseParts();
             Templates.Add(t);
         }
 
-        await _selectorService.EnsureAsync();
-        _selectors = await _selectorService.LoadAsync();
-
+        await _selector_service_ensure_load();
         var settings = await _settings.LoadAsync();
 
-        // Attach runner counters
         _runner.CountersChanged += (s, f, w) =>
         {
             MainThread.BeginInvokeOnMainThread(() =>
@@ -80,12 +75,18 @@ public class SenderViewModel : INotifyPropertyChanged
         };
     }
 
-    // Overloads for AttachDom to satisfy different call sites
+    private async Task _selector_service_ensure_load()
+    {
+        await _selectorService.EnsureAsync();
+        _selectors = await _selectorService.LoadAsync();
+    }
+
+    // Attach DOM variants for different call sites
     public void AttachDom(WebView webView)
     {
         _dom = new DomBridge(webView);
         if (_selectors != null) _dom.AttachSelectors(_selectors);
-        _runner.AttachDom(_dom!, _selectors ?? new SelectorMap());
+        _runner.AttachDom(_dom, _selectors ?? new SelectorMap());
     }
 
     public void AttachDom(DomBridge dom, SelectorMap selectors)
@@ -108,15 +109,18 @@ public class SenderViewModel : INotifyPropertyChanged
 
     public async Task AddAccountAsync(string login, string password)
     {
-        var acc = new Account { Login = login.Trim(), Password = password };
+        var acc = new Account { Login = login?.Trim() ?? string.Empty, Password = password ?? string.Empty };
         await _accounts.AddAsync(acc);
         Accounts.Add(acc);
     }
 
     public async Task RemoveAccountAsync(Account a)
     {
-        if (a is null) return;
+        if (a == null) return;
         await _accounts.RemoveByLoginAsync(a.Login);
         Accounts.Remove(a);
     }
+
+    public event PropertyChangedEventHandler? PropertyChanged;
+    private void Notify([CallerMemberName] string? n = null) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(n));
 }

@@ -1,4 +1,5 @@
-﻿using System.Text;
+﻿// Services/FileUtil.cs
+using System.Text;
 using System.Text.Json;
 
 namespace MauiSender.Services;
@@ -6,7 +7,9 @@ namespace MauiSender.Services;
 internal static class FileUtil
 {
     public static string DataDir => FileSystem.AppDataDirectory;
-    public static string PathInData(string fileName) => Path.Combine(DataDir, fileName);
+
+    public static string PathInData(string fileName) =>
+        System.IO.Path.Combine(DataDir, fileName);
 
     public static void EnsureDir()
     {
@@ -27,7 +30,9 @@ internal static class FileUtil
     public static async Task<T> LoadJsonAsync<T>(string path, T fallback)
     {
         EnsureDir();
-        if (!File.Exists(path)) return fallback;
+        if (!File.Exists(path))
+            return fallback;
+
         try
         {
             var json = await File.ReadAllTextAsync(path, Encoding.UTF8);
