@@ -1,5 +1,4 @@
-﻿// Services/AccountsService.cs
-using MauiSender.Models;
+﻿using MauiSender.Models;
 
 namespace MauiSender.Services;
 

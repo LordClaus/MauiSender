@@ -3,6 +3,7 @@ using Microsoft.Maui.Controls.Hosting;
 using MauiSender.Services;
 using MauiSender.ViewModels;
 using MauiSender.Pages;
+using MauiSender.Services;
 
 namespace MauiSender;
 
@@ -10,6 +11,7 @@ public static class MauiProgram
 {
     public static MauiApp CreateMauiApp()
     {
+
         var builder = MauiApp.CreateBuilder();
         builder
             .UseMauiApp<App>();
@@ -29,6 +31,12 @@ public static class MauiProgram
         builder.Services.AddTransient<AccountsPage>();
         builder.Services.AddTransient<ChatPage>();
 
-        return builder.Build();
+        var app = builder.Build();
+
+        // І лише після цього можемо використати сервіси
+        var init = app.Services.GetRequiredService<InitService>();
+        init.EnsureAllSync();
+
+        return app;
     }
 }

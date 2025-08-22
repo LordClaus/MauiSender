@@ -1,5 +1,4 @@
-﻿// Services/BlacklistRepo.cs
-namespace MauiSender.Services;
+﻿namespace MauiSender.Services;
 
 public class BlacklistRepo
 {
@@ -25,11 +24,5 @@ public class BlacklistRepo
     {
         var set = new HashSet<string>(ids, StringComparer.OrdinalIgnoreCase);
         await SaveAsync(set);
-    }
-
-    // synchronous helper for older call sites
-    public void ReplaceAll(IEnumerable<string> ids)
-    {
-        ReplaceAllAsync(ids).GetAwaiter().GetResult();
     }
 }

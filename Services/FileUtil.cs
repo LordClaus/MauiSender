@@ -1,5 +1,4 @@
-﻿// Services/FileUtil.cs
-using System.Text;
+﻿using System.Text;
 using System.Text.Json;
 
 namespace MauiSender.Services;
@@ -9,7 +8,7 @@ internal static class FileUtil
     public static string DataDir => FileSystem.AppDataDirectory;
 
     public static string PathInData(string fileName) =>
-        System.IO.Path.Combine(DataDir, fileName);
+        Path.Combine(DataDir, fileName);
 
     public static void EnsureDir()
     {
@@ -41,6 +40,7 @@ internal static class FileUtil
         }
         catch
         {
+            // якщо файл пошкоджений — повернути fallback (не кидати)
             return fallback;
         }
     }

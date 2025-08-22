@@ -1,39 +1,45 @@
-﻿using MauiSender.Models;
-
-namespace MauiSender.Services;
+﻿namespace MauiSender.Services;
 
 public class InitService
 {
-    private readonly SettingsService _settingsService;
     private readonly AccountsService _accounts;
     private readonly TemplatesRepo _templates;
     private readonly BlacklistRepo _blacklist;
-    private readonly SelectorMapService _selectors;
     private readonly LogsRepo _logs;
+    private readonly SelectorMapService _selectors;
+    private readonly SettingsService _settings;
 
     public InitService(
-        SettingsService settingsService,
         AccountsService accounts,
         TemplatesRepo templates,
         BlacklistRepo blacklist,
+        LogsRepo logs,
         SelectorMapService selectors,
-        LogsRepo logs)
+        SettingsService settings)
     {
-        _settingsService = settingsService;
         _accounts = accounts;
         _templates = templates;
         _blacklist = blacklist;
-        _selectors = selectors;
         _logs = logs;
+        _selectors = selectors;
+        _settings = settings;
     }
 
-    public async Task InitAsync()
+    public async Task EnsureAllAsync()
     {
-        await _settingsService.EnsureAsync();
-        await _accounts.EnsureAsync();
-        await _templates.EnsureAsync();
-        await _blacklist.EnsureAsync();
-        await _selectors.EnsureAsync();
-        await _logs.EnsureAsync();
+        // Впевнитися, що всі необхідні файли існують (створити, якщо нема)
+        var tasks = new List<Task>
+        {
+            _settings.EnsureAsync(),
+            _accounts.EnsureAsync(),
+            _templates.EnsureAsync(),
+            _blacklist.EnsureAsync(),
+            _logs.EnsureAsync(),
+            _selectors.EnsureAsync()
+        };
+        await Task.WhenAll(tasks);
     }
+
+    // Синхронний варіант для виклику під час старту (без async/await в App ctor)
+    public void EnsureAllSync() => EnsureAllAsync().GetAwaiter().GetResult();
 }

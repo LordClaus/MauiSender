@@ -1,6 +1,5 @@
-﻿// Services/LogsRepo.cs
+﻿using MauiSender.Models;
 using System.Text;
-using MauiSender.Models;
 
 namespace MauiSender.Services;
 
@@ -29,7 +28,6 @@ public class LogsRepo
     {
         var list = await LoadAsync();
         var filtered = list.Where(l => l.Ts >= from && l.Ts <= to).ToList();
-
         var sb = new StringBuilder();
         sb.AppendLine("Id,UserId,TemplateId,PartIndex,Ts,Status,Error");
         foreach (var l in filtered)
@@ -37,7 +35,6 @@ public class LogsRepo
             var err = l.Error?.Replace("\"", "\"\"") ?? "";
             sb.AppendLine($"\"{l.Id}\",\"{l.UserId}\",\"{l.TemplateId}\",{l.PartIndex},\"{l.Ts:o}\",\"{l.Status}\",\"{err}\"");
         }
-
         await File.WriteAllTextAsync(filePath, sb.ToString(), Encoding.UTF8);
         return filePath;
     }

@@ -27,7 +27,7 @@ public class TemplateRepo
     }
 
     public Template? GetByName(string name) => _db.Table<Template>().FirstOrDefault(t => t.Name == name);
-    public Template? GetById(int id) => _db.Table<Template>().FirstOrDefault(t => t.Id == id);
+    //public Template? GetById(int id) => _db.Table<Template>().FirstOrDefault(t => t.Id == id);
 
     public Template Pick(string mode)
     {
